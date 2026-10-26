@@ -101,27 +101,12 @@ svg text{fill:var(--muted);font-family:var(--mono);font-size:10px}
 </head>
 <body>
 
-<div class="auth" id="authView" hidden>
-  <div class="lanes" aria-hidden="true"></div>
-  <h1>Бег, турник, брусья</h1>
-  <p class="sub" id="authSub">Войди, чтобы записи синхронизировались между телефоном и компьютером.</p>
-  <form class="panel" id="authForm">
-    <div class="field"><label class="label" for="aEmail">Почта</label><input type="text" id="aEmail" inputmode="email" autocomplete="email" required></div>
-    <div class="field"><label class="label" for="aPass">Пароль (от 6 символов)</label><input type="password" id="aPass" autocomplete="current-password" required style="font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);width:100%"></div>
-    <p class="err" id="authErr" role="alert"></p>
-    <div class="row">
-      <button class="btn" type="submit" id="aLogin">Войти</button>
-      <button class="btn ghost" type="button" id="aSignup">Создать аккаунт</button>
-    </div>
-  </form>
-</div>
-
-<div class="wrap" id="appView" hidden>
+<div class="wrap" id="appView">
   <header>
     <div class="lanes" aria-hidden="true"></div>
     <div class="topbar" style="margin-top:14px">
       <h1>Бег, турник, брусья</h1>
-      <button class="link" type="button" id="signOut" hidden>Выйти</button>
+      <a class="link" href="#sync">Синхронизация</a>
     </div>
     <p class="sub">10 км спокойным темпом и 15 подтягиваний. <span class="status" id="status"></span></p>
   </header>
@@ -187,17 +172,32 @@ svg text{fill:var(--muted);font-family:var(--mono);font-size:10px}
     <h2 id="j-h">Журнал</h2>
     <div class="panel journal" id="journal"></div>
   </section>
+
+  <section aria-labelledby="s-h" id="sync">
+    <h2 id="s-h">Синхронизация <small id="syncState"></small></h2>
+    <form class="panel" id="syncForm">
+      <p class="hint">Записи хранятся в твоём приватном репозитории GitHub. Введи одни и те же данные на телефоне и на компьютере, и записи будут общими.</p>
+      <div class="row">
+        <div class="field"><label class="label" for="sRepo">Репозиторий для записей</label><input type="text" id="sRepo" value="caroleporter09-crypto/training-data" autocapitalize="off" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="label" for="sToken">Ключ доступа GitHub (github_pat_…)</label><input type="password" id="sToken" autocomplete="off" spellcheck="false" style="font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);width:100%"></div>
+      </div>
+      <p class="err" id="syncErr" role="alert"></p>
+      <div class="row">
+        <button class="btn" type="submit">Подключить</button>
+        <button class="btn ghost" type="button" id="syncNow">Синхронизировать сейчас</button>
+        <button class="link" type="button" id="syncOff">Отключить на этом устройстве</button>
+      </div>
+    </form>
+  </section>
 </div>
 
-<script src="config.js"></script>
-<script src="vendor/firebase-app-compat.js"></script>
-<script src="vendor/firebase-auth-compat.js"></script>
-<script src="vendor/firebase-firestore-compat.js"></script>
 <script>
 const START = "2026-10-26";             // понедельник первой недели плана
 const PLAN = [5,5.5,6,5.5, 6.5,7,7.5,7, 8,8.5,9,8.5, 9.5,10];
 const DELOAD = new Set([4,8,12]);
-const DEFAULT = {startDate:START, goals:{run:10,pull:15,dip:15}, entries:[]};
+const DEFAULT = {startDate:START, goals:{run:10,pull:15,dip:15}, entries:[], deleted:[]};
 let state = JSON.parse(JSON.stringify(DEFAULT));
 let docRef = null, saving = Promise.resolve();
 let curType = "run";
@@ -363,17 +363,83 @@ function renderJournal(){
 }
 
 // ---------- persistence ----------
-// Firestore: users/{uid} = {startDate, goals, entries}. Offline writes are queued and sent later.
-function save(){
-  try{ localStorage.setItem("training-log", JSON.stringify(state)); }catch(e){}
-  if(!docRef) return Promise.resolve();
-  const snapshot = JSON.parse(JSON.stringify(state));
-  docRef.set(snapshot).catch(err=>{ $("status").textContent = "Не сохранилось в облако ("+(err&&err.code||"ошибка")+"). Запись осталась на устройстве."; });
-  return Promise.resolve();
-}
-function loadLocal(){ try{ const s = localStorage.getItem("training-log"); if(s) state = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(s)); }catch(e){} }
-// Первая запись Шамиля: 3 подтягивания 25 октября (тест на максимум)
+// Всегда сначала на устройстве; потом – файл log.json в приватном репозитории GitHub.
+// Слияние по id записей, удалённые id хранятся в state.deleted, чтобы удаление тоже синхронизировалось.
 const FIRST_ENTRIES = [{id:"seed-pull-1025", date:"2026-10-25", type:"pull", sets:[3], neg:0, test:true}];
+const LS = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }, del(k){ try{ localStorage.removeItem(k); }catch(e){} } };
+function saveLocal(){ LS.set("training-log", JSON.stringify(state)); }
+function loadLocal(){ const s = LS.get("training-log"); if(s){ try{ state = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(s)); }catch(e){} } if(!state.deleted) state.deleted = []; }
+function setStatus(t){ $("status").textContent = t; $("syncState").textContent = t; }
+
+const gh = {
+  get repo(){ return (LS.get("gh-repo") || "").trim(); },
+  get token(){ return (LS.get("gh-token") || "").trim(); },
+  get ok(){ return !!(this.repo && this.token); },
+  url(){ return "https://api.github.com/repos/" + this.repo + "/contents/log.json"; },
+  headers(){ return {"Authorization":"Bearer " + this.token, "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28"}; },
+};
+const b64enc = str => { const bytes = new TextEncoder().encode(str); let bin = ""; bytes.forEach(b=>bin += String.fromCharCode(b)); return btoa(bin); };
+const b64dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g,"")), c=>c.charCodeAt(0)));
+const ghError = (status) => ({401:"Ключ не подходит или истёк. Создай новый и вставь его заново.",403:"У ключа нет права записи. В настройках ключа нужно Contents: Read and write.",404:"Репозиторий не найден. Проверь название и что ключ выдан именно на него."}[status] || ("GitHub ответил ошибкой " + status + "."));
+
+async function pull(){
+  const r = await fetch(gh.url() + "?t=" + Date.now(), {headers: gh.headers(), cache:"no-store"});
+  if (r.status === 404) {
+    // файла ещё нет – проверим, что сам репозиторий доступен
+    const rr = await fetch("https://api.github.com/repos/" + gh.repo, {headers: gh.headers()});
+    if (!rr.ok) throw {status: rr.status};
+    return {data:null, sha:null};
+  }
+  if (!r.ok) throw {status: r.status};
+  const j = await r.json();
+  return {data: JSON.parse(b64dec(j.content)), sha: j.sha};
+}
+function merge(remote){
+  if (!remote) return false;
+  const before = JSON.stringify(state);
+  const deleted = new Set([...(state.deleted||[]), ...(remote.deleted||[])]);
+  const byId = new Map();
+  [...(remote.entries||[]), ...state.entries].forEach(e => { if(!deleted.has(e.id)) byId.set(e.id, e); });
+  state.entries = [...byId.values()].sort((a,b)=>a.date.localeCompare(b.date) || (a.id<b.id?-1:1));
+  state.deleted = [...deleted];
+  state.goals = Object.assign({}, remote.goals||{}, state.goals||{});
+  state.startDate = state.startDate || remote.startDate || START;
+  return JSON.stringify(state) !== before;
+}
+async function push(sha){
+  const body = {message: "Тренировки: обновление " + new Date().toISOString().slice(0,16).replace("T"," "), content: b64enc(JSON.stringify(state, null, 1))};
+  if (sha) body.sha = sha;
+  const r = await fetch(gh.url(), {method:"PUT", headers: Object.assign({"Content-Type":"application/json"}, gh.headers()), body: JSON.stringify(body)});
+  if (r.status === 409 || r.status === 422) return false; // файл изменился на другом устройстве
+  if (!r.ok) throw {status: r.status};
+  return true;
+}
+let syncing = null, again = false;
+async function sync(){
+  if (!gh.ok) { setStatus("Записи хранятся на этом устройстве. Подключи синхронизацию внизу страницы."); return; }
+  if (syncing) { again = true; return syncing; }
+  syncing = (async () => {
+    setStatus("Синхронизация…"); $("syncErr").textContent = "";
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const {data, sha} = await pull();
+        const remoteStr = data ? JSON.stringify(data) : null;
+        if (merge(data)) { saveLocal(); render(); }
+        if (remoteStr === JSON.stringify(state)) { LS.del("gh-dirty"); break; }
+        if (await push(sha)) { LS.del("gh-dirty"); break; }
+      }
+      const t = new Date(); setStatus("Синхронизировано в " + String(t.getHours()).padStart(2,"0") + ":" + String(t.getMinutes()).padStart(2,"0") + ".");
+    } catch (err) {
+      if (err && err.status) { $("syncErr").textContent = ghError(err.status); setStatus("Не синхронизировано."); }
+      else setStatus("Нет интернета. Записи на устройстве, отправятся позже.");
+    } finally {
+      syncing = null;
+      if (again) { again = false; sync(); }
+    }
+  })();
+  return syncing;
+}
+function save(){ saveLocal(); LS.set("gh-dirty","1"); return sync(); }
 
 // ---------- form ----------
 function setType(t){
@@ -410,48 +476,30 @@ $("logForm").addEventListener("submit", async e=>{
 $("journal").addEventListener("click", e=>{
   const b = e.target.closest(".del"); if(!b) return;
   if(!b.classList.contains("arm")){ b.classList.add("arm"); b.textContent = "Точно?"; setTimeout(()=>{ if(b.isConnected){ b.classList.remove("arm"); b.textContent="Удалить"; } }, 3000); return; }
-  state.entries = state.entries.filter(x=>x.id!==b.dataset.id); render(); save();
+  (state.deleted = state.deleted || []).push(b.dataset.id); state.entries = state.entries.filter(x=>x.id!==b.dataset.id); render(); save();
 });
 
 // ---------- boot ----------
 loadLocal(); setType("run");
-const cfg = window.FIREBASE_CONFIG;
-const showApp = () => { $("authView").hidden = true; $("appView").hidden = false; render(); };
-const showAuth = () => { $("appView").hidden = true; $("authView").hidden = false; };
-
-if (!cfg || !window.firebase) {
-  if (!state.entries.length) state.entries = FIRST_ENTRIES.slice();
-  showApp(); $("status").textContent = "Облако не подключено: записи хранятся на этом устройстве.";
-} else {
-  firebase.initializeApp(cfg);
-  const auth = firebase.auth(), fs = firebase.firestore();
-  fs.enablePersistence({synchronizeTabs:true}).catch(()=>{});
-  let unsub = null;
-  const RU = {"auth/invalid-email":"Почта записана с ошибкой.","auth/missing-password":"Введи пароль.","auth/weak-password":"Пароль слишком короткий, нужно от 6 символов.","auth/email-already-in-use":"Аккаунт с этой почтой уже есть, нажми «Войти».","auth/invalid-credential":"Неверная почта или пароль.","auth/wrong-password":"Неверный пароль.","auth/user-not-found":"Такого аккаунта нет, нажми «Создать аккаунт».","auth/network-request-failed":"Нет интернета. Для первого входа он нужен.","auth/too-many-requests":"Слишком много попыток, подожди пару минут.","auth/operation-not-allowed":"В Firebase не включён вход по почте и паролю."};
-  const authErr = e => { $("authErr").textContent = RU[e && e.code] || ("Не получилось: " + (e && (e.code || e.message))); };
-  const creds = () => [$("aEmail").value.trim(), $("aPass").value];
-  $("authForm").addEventListener("submit", e => { e.preventDefault(); $("authErr").textContent = ""; auth.signInWithEmailAndPassword(...creds()).catch(authErr); });
-  $("aSignup").addEventListener("click", () => { $("authErr").textContent = ""; auth.createUserWithEmailAndPassword(...creds()).catch(authErr); });
-  $("signOut").addEventListener("click", () => auth.signOut());
-  auth.onAuthStateChanged(u => {
-    if (unsub) { unsub(); unsub = null; }
-    if (!u) { docRef = null; $("signOut").hidden = true; showAuth(); return; }
-    $("signOut").hidden = false; showApp();
-    docRef = fs.collection("users").doc(u.uid);
-    unsub = docRef.onSnapshot({includeMetadataChanges:true}, snap => {
-      if (snap.exists) {
-        state = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), snap.data());
-        try{ localStorage.setItem("training-log", JSON.stringify(state)); }catch(e){}
-        render();
-      } else if (!snap.metadata.fromCache) {
-        if (!state.entries.length) state.entries = FIRST_ENTRIES.slice();
-        save(); render();
-      }
-      $("status").textContent = snap.metadata.hasPendingWrites ? "Есть записи, которые ещё не ушли в облако, отправятся при появлении интернета."
-        : snap.metadata.fromCache ? "Без интернета: записи сохранятся и отправятся позже." : "Синхронизировано с " + u.email + ".";
-    }, err => { $("status").textContent = "Ошибка облака: " + (err.code || err.message); });
-  });
-}
+if (!state.entries.length && !LS.get("seeded")) { state.entries = FIRST_ENTRIES.slice(); LS.set("seeded","1"); saveLocal(); }
+render();
+if (gh.repo) $("sRepo").value = gh.repo;
+if (gh.token) $("sToken").placeholder = "ключ сохранён на этом устройстве";
+$("syncForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const repo = $("sRepo").value.trim().replace(/^https?:\/\/github\.com\//,"").replace(/\/$/,""), token = $("sToken").value.trim();
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { $("syncErr").textContent = "Название репозитория пишется так: владелец/имя, например caroleporter09-crypto/training-data."; return; }
+  if (!token && !gh.token) { $("syncErr").textContent = "Вставь ключ доступа."; return; }
+  LS.set("gh-repo", repo); if (token) LS.set("gh-token", token);
+  $("sToken").value = ""; $("sToken").placeholder = "ключ сохранён на этом устройстве";
+  sync();
+});
+$("syncNow").addEventListener("click", () => sync());
+$("syncOff").addEventListener("click", () => { LS.del("gh-token"); $("sToken").placeholder = ""; setStatus("Синхронизация отключена на этом устройстве."); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sync(); });
+window.addEventListener("online", () => sync());
+setInterval(() => { if (document.visibilityState === "visible") sync(); }, 5*60*1000);
+sync();
 </script>
 </body>
 </html>

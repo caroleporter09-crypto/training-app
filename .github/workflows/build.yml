@@ -32,11 +32,6 @@ jobs:
       - name: Установить зависимости
         run: npm install
 
-      - name: Положить Firebase в приложение
-        run: |
-          mkdir -p www/vendor
-          cp node_modules/firebase/firebase-app-compat.js node_modules/firebase/firebase-auth-compat.js node_modules/firebase/firebase-firestore-compat.js www/vendor/
-
       - name: Создать Android-проект
         run: |
           npx cap add android
