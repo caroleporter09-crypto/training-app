@@ -32,6 +32,9 @@ jobs:
       - name: Установить зависимости
         run: npm install
 
+      - name: Номер сборки в приложение
+        run: sed -i "s/__BUILD__/${{ github.run_number }}/" www/index.html
+
       - name: Создать Android-проект
         run: |
           npx cap add android
