@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E7350">
+<title>Бег, турник, брусья</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Sans+Extra+Condensed:wght@600;800&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a single training-log column — goal meters, this week, log form, programmes, plan, charts, journal. Lane stripes are the one ornament. */
+:root{
+  --bg:#F2F4F1; --surface:#FFFFFF; --ink:#13201A; --muted:#5E6B64; --line:#D9DFDA;
+  --accent:#0E7350; --accent-soft:#DCEFE6; --lane:#D9961A; --lane-soft:#F7EBD2; --danger:#B23A2E;
+  --display:"Fira Sans Extra Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1613; --surface:#17211C; --ink:#E6EDE9; --muted:#93A39A; --line:#2A3832;
+  --accent:#3FBF8C; --accent-soft:#1B3A2D; --lane:#E9AE3C; --lane-soft:#3A2F17; --danger:#E5705F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1613; --surface:#17211C; --ink:#E6EDE9; --muted:#93A39A; --line:#2A3832;
+  --accent:#3FBF8C; --accent-soft:#1B3A2D; --lane:#E9AE3C; --lane-soft:#3A2F17; --danger:#E5705F; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
+[hidden]{display:none!important}
+.auth{max-width:420px;margin:12vh auto 0;display:flex;flex-direction:column;gap:14px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.link{font:inherit;font-size:.85rem;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
+.err{color:var(--danger);font-size:.9rem;margin:0;min-height:1.2em}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);font-weight:800;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:2.4rem;line-height:1;text-transform:uppercase}
+h2{font-size:1.45rem;text-transform:uppercase;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 small{font-family:var(--body);font-weight:500;font-size:.85rem;color:var(--muted);text-transform:none;letter-spacing:0}
+.lanes{height:8px;background:repeating-linear-gradient(90deg,var(--lane) 0 28px,transparent 28px 40px);opacity:.85;border-radius:2px}
+.sub{color:var(--muted);margin:6px 0 0}
+section{display:flex;flex-direction:column;gap:12px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.goals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.goals{grid-template-columns:1fr}}
+.goal{display:flex;flex-direction:column;gap:6px}
+.goal .big{font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1}
+.goal .big span{font-size:1rem;color:var(--muted);font-weight:600}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .4s}
+.week{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.weekno{font-family:var(--display);font-weight:800;font-size:3.4rem;line-height:.9;color:var(--accent)}
+.checks{display:flex;flex-direction:column;gap:6px}
+.check{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dots{display:flex;gap:5px}
+.dots b{width:14px;height:14px;border-radius:50%;border:2px solid var(--accent)}
+.dots b.on{background:var(--accent)}
+.pill{display:inline-block;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--lane-soft);color:var(--ink);text-transform:uppercase;letter-spacing:.05em}
+.pill.g{background:var(--accent-soft)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:fit-content;max-width:100%}
+.seg button{border:0;background:transparent;padding:8px 14px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+form{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px;flex:1 1 140px;min-width:0}
+input[type=text],input[type=number],input[type=date]{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);width:100%}
+input:focus-visible,button:focus-visible{outline:2px solid var(--lane);outline-offset:2px}
+.tick{display:flex;gap:8px;align-items:center;cursor:pointer}
+.btn{font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px 18px;background:var(--accent);color:var(--surface);cursor:pointer;width:fit-content}
+.btn:hover{filter:brightness(1.08)}
+.hint{color:var(--muted);font-size:.85rem;margin:0}
+.toast{color:var(--accent);font-weight:600;font-size:.9rem;min-height:1.3em;margin:0}
+.prog{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.prog{grid-template-columns:1fr}}
+.prog h3{font-family:var(--display);font-size:1.15rem;margin:0 0 4px;text-transform:uppercase}
+.prog ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:420px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+tr.now td{background:var(--accent-soft);font-weight:600}
+tr:last-child td{border-bottom:0}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:600px){.charts{grid-template-columns:1fr}}
+svg text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.journal{display:flex;flex-direction:column}
+.entry{display:grid;grid-template-columns:76px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.entry:last-child{border-bottom:0}
+.entry .what{min-width:0}
+.entry .del{font:inherit;font-size:.8rem;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 8px;cursor:pointer}
+.entry .del.arm{border-color:var(--danger);color:var(--danger)}
+.empty{color:var(--muted);padding:12px 0}
+.status{font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="auth" id="authView" hidden>
+  <div class="lanes" aria-hidden="true"></div>
+  <h1>Бег, турник, брусья</h1>
+  <p class="sub" id="authSub">Войди, чтобы записи синхронизировались между телефоном и компьютером.</p>
+  <form class="panel" id="authForm">
+    <div class="field"><label class="label" for="aEmail">Почта</label><input type="text" id="aEmail" inputmode="email" autocomplete="email" required></div>
+    <div class="field"><label class="label" for="aPass">Пароль (от 6 символов)</label><input type="password" id="aPass" autocomplete="current-password" required style="font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);width:100%"></div>
+    <p class="err" id="authErr" role="alert"></p>
+    <div class="row">
+      <button class="btn" type="submit" id="aLogin">Войти</button>
+      <button class="btn ghost" type="button" id="aSignup">Создать аккаунт</button>
+    </div>
+  </form>
+</div>
+
+<div class="wrap" id="appView" hidden>
+  <header>
+    <div class="lanes" aria-hidden="true"></div>
+    <div class="topbar" style="margin-top:14px">
+      <h1>Бег, турник, брусья</h1>
+      <button class="link" type="button" id="signOut" hidden>Выйти</button>
+    </div>
+    <p class="sub">10 км спокойным темпом и 15 подтягиваний. <span class="status" id="status"></span></p>
+  </header>
+
+  <section aria-labelledby="g-h">
+    <h2 id="g-h">Цели</h2>
+    <div class="goals" id="goals"></div>
+  </section>
+
+  <section aria-labelledby="w-h">
+    <h2 id="w-h">Эта неделя <small id="weekRange"></small></h2>
+    <div class="panel week">
+      <div><div class="label">неделя</div><div class="weekno num" id="weekNo">1</div></div>
+      <div class="checks" id="weekChecks"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="l-h">
+    <h2 id="l-h">Записать тренировку</h2>
+    <form class="panel" id="logForm">
+      <div class="seg" role="group" aria-label="Тип тренировки">
+        <button type="button" data-t="run" aria-pressed="true">Бег</button>
+        <button type="button" data-t="pull" aria-pressed="false">Подтягивания</button>
+        <button type="button" data-t="dip" aria-pressed="false">Брусья</button>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:0 1 170px"><label class="label" for="fDate">Дата</label><input type="date" id="fDate" required></div>
+      </div>
+      <div class="row" id="runFields">
+        <div class="field"><label class="label" for="fKm">Дистанция, км</label><input type="number" id="fKm" step="0.1" min="0" inputmode="decimal" placeholder="5"></div>
+        <div class="field"><label class="label" for="fTime">Время (мм:сс)</label><input type="text" id="fTime" placeholder="32:30" inputmode="numeric"></div>
+      </div>
+      <div class="row" id="setFields" hidden>
+        <div class="field" style="flex-basis:220px"><label class="label" for="fSets">Повторения по подходам</label><input type="text" id="fSets" placeholder="2 2 1 2 1 2" inputmode="numeric"></div>
+        <div class="field"><label class="label" for="fNeg">Негативные, всего</label><input type="number" id="fNeg" min="0" placeholder="0" inputmode="numeric"></div>
+      </div>
+      <label class="tick" id="testWrap" hidden><input type="checkbox" id="fTest"> Тест на максимум (один подход до отказа)</label>
+      <p class="hint" id="formHint">Темп посчитается сам.</p>
+      <button class="btn" type="submit">Сохранить</button>
+      <p class="toast" id="toast" role="status"></p>
+    </form>
+  </section>
+
+  <section aria-labelledby="p-h">
+    <h2 id="p-h">Программа на следующую силовую</h2>
+    <div class="prog" id="prog"></div>
+  </section>
+
+  <section aria-labelledby="pl-h">
+    <h2 id="pl-h">План бега <small>3 пробежки в неделю, +500 м, каждая 4-я неделя разгрузочная</small></h2>
+    <div class="tablebox"><table><thead><tr><th>Неделя</th><th>Даты</th><th>Пробежка</th><th>За неделю</th><th>Сделано</th></tr></thead><tbody id="planBody"></tbody></table></div>
+  </section>
+
+  <section aria-labelledby="c-h">
+    <h2 id="c-h">Прогресс</h2>
+    <div class="charts">
+      <div class="panel"><div class="label">Подтягивания: лучший подход</div><div id="chPull"></div></div>
+      <div class="panel"><div class="label">Бег: км за неделю и план</div><div id="chRun"></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="j-h">
+    <h2 id="j-h">Журнал</h2>
+    <div class="panel journal" id="journal"></div>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-auth-compat.js"></script>
+<script src="vendor/firebase-firestore-compat.js"></script>
+<script>
+const START = "2026-10-26";             // понедельник первой недели плана
+const PLAN = [5,5.5,6,5.5, 6.5,7,7.5,7, 8,8.5,9,8.5, 9.5,10];
+const DELOAD = new Set([4,8,12]);
+const DEFAULT = {startDate:START, goals:{run:10,pull:15,dip:15}, entries:[]};
+let state = JSON.parse(JSON.stringify(DEFAULT));
+let docRef = null, saving = Promise.resolve();
+let curType = "run";
+const $ = id => document.getElementById(id);
+
+// ---------- dates ----------
+const DAY = 864e5;
+const parseD = s => { const [y,m,d] = s.split("-").map(Number); return new Date(Date.UTC(y,m-1,d)); };
+const fmtISO = d => d.toISOString().slice(0,10);
+const todayISO = () => { const n = new Date(); return fmtISO(new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()))); };
+const MON = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+const human = s => { const d = parseD(s); return d.getUTCDate()+" "+MON[d.getUTCMonth()]; };
+const weekOf = s => Math.floor((parseD(s) - parseD(state.startDate)) / (7*DAY)) + 1;
+const weekStart = w => fmtISO(new Date(parseD(state.startDate).getTime() + (w-1)*7*DAY));
+const weekEnd = w => fmtISO(new Date(parseD(state.startDate).getTime() + ((w-1)*7+6)*DAY));
+const target = w => w < 1 ? PLAN[0] : (PLAN[w-1] ?? 10);
+const nf = n => (Math.round(n*10)/10).toString().replace(".", ",");
+
+// ---------- parsing ----------
+function parseTime(s){
+  s = (s||"").trim(); if(!s) return null;
+  if (s.includes(":")) { const p = s.split(":").map(Number); if (p.some(isNaN)) return null;
+    return p.length===3 ? p[0]*60+p[1]+p[2]/60 : p[0]+p[1]/60; }
+  const n = Number(s.replace(",", ".")); return isNaN(n) ? null : n;
+}
+const parseSets = s => (s||"").split(/[\s,;+\-]+/).map(x=>parseInt(x,10)).filter(n=>n>0);
+function pace(min, km){ if(!min||!km) return ""; const p = min/km; let m = Math.floor(p), sec = Math.round((p-m)*60); if(sec===60){m++;sec=0;} return m+":"+String(sec).padStart(2,"0")+" /км"; }
+const fmtMin = m => { const h = Math.floor(m/60), mm = Math.floor(m%60), ss = Math.round((m%1)*60)%60; return (h?h+":"+String(mm).padStart(2,"0"):mm)+":"+String(ss).padStart(2,"0"); };
+
+// ---------- derived ----------
+const byType = t => state.entries.filter(e=>e.type===t).sort((a,b)=>a.date.localeCompare(b.date));
+const best = e => e.sets && e.sets.length ? Math.max(...e.sets) : 0;
+function currentMax(t){
+  const list = byType(t); if(!list.length) return 0;
+  const tests = list.filter(e=>e.test);
+  const lastTest = tests.length ? best(tests[tests.length-1]) : 0;
+  const recent = list.slice(-4).map(best);
+  return Math.max(lastTest, ...recent);
+}
+
+// ---------- programmes ----------
+function pullProgram(m, sessionsThisWeek){
+  const dayB = sessionsThisWeek % 2 === 1;
+  if (m <= 0) return {title:"Старт с нуля", items:["Негативные: 4 подхода по 3, вниз за 5 секунд","Вис на турнике: 3 × 20–30 с","Отдых между подходами 90 с"]};
+  if (m <= 5) {
+    const lo = Math.max(1, Math.floor(m/2)), hi = Math.max(lo, Math.ceil(m/2)+ (m>=4?1:0));
+    return dayB
+      ? {title:"День Б · негативы", items:["Негативные: 4 подхода по 4, вниз за 4–5 с","Потом 3 подхода по "+lo+" обычных","Вис 2 × максимум"]}
+      : {title:"День А · лесенка", items:["8–10 подходов по "+(lo===hi?lo:lo+"–"+hi)+", отдых 60–90 с","Всего около "+(m*3+2)+" повторений","Негативные в конце: 3 × 3"]};
+  }
+  if (m <= 10) {
+    return dayB
+      ? {title:"День Б · лесенка", items:["Лесенка 1-2-3 ×3 круга (18 повторений)","Отдых между ступенями 30–45 с, между кругами 2 мин","Негативные: 2 × 3"]}
+      : {title:"День А · объём", items:["5 подходов по "+Math.round(m*0.6)+", отдых 90 с","Последний подход до отказа","Тяга гантели в наклоне 3 × 10"]};
+  }
+  return dayB
+    ? {title:"День Б · лесенка", items:["Лесенка 1-2-3-4 ×3 круга","Широкий хват: 2 подхода по "+Math.round(m*0.4)]}
+    : {title:"День А · объём", items:["5 подходов по "+Math.round(m*0.65)+", отдых 2 мин","Последний до отказа"]};
+}
+function dipProgram(m){
+  if (m <= 0) return {title:"Старт", items:["Упор на брусьях: 3 × 20–30 с","Негативные: 3 × 3, вниз за 3–4 с","Не опускайся ниже, чем плечо на уровне локтя"]};
+  if (m <= 5) return {title:"Набор силы", items:["5 подходов по "+Math.max(1,m-1)+", отдых 90 с","Негативные: 2 × 3","Плечо не ниже локтя"]};
+  if (m <= 12) return {title:"Объём", items:["4 подхода по "+(m-2)+", отдых 90 с","Последний до отказа"]};
+  return {title:"Объём", items:["4 подхода по "+Math.round(m*0.75),"Медленный спуск 3 с в каждом повторении"]};
+}
+
+// ---------- render ----------
+function render(){
+  const today = todayISO(), w = Math.max(1, weekOf(today));
+  const g = state.goals;
+  const longest = Math.max(0, ...byType("run").map(e=>e.km||0));
+  const pm = currentMax("pull"), dm = currentMax("dip");
+  const meter = (label, val, goal, unit) => {
+    const pct = Math.min(100, goal ? val/goal*100 : 0);
+    return `<div class="panel goal"><div class="label">${label}</div>
+      <div class="big num">${nf(val)}<span> / ${goal} ${unit}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  };
+  $("goals").innerHTML = meter("Самая длинная пробежка", longest, g.run, "км") + meter("Подтягивания, максимум", pm, g.pull, "раз") + meter("Брусья, максимум", dm, g.dip, "раз");
+
+  // week
+  const ws = weekStart(w), we = weekEnd(w);
+  const inWeek = e => e.date >= ws && e.date <= we;
+  const runs = byType("run").filter(inWeek), pulls = byType("pull").filter(inWeek), dips = byType("dip").filter(inWeek);
+  const km = runs.reduce((s,e)=>s+(e.km||0),0);
+  const dots = (n, total) => `<span class="dots">${Array.from({length:total},(_,i)=>`<b class="${i<n?"on":""}"></b>`).join("")}</span>`;
+  $("weekNo").textContent = w;
+  $("weekRange").textContent = human(ws)+" – "+human(we);
+  $("weekChecks").innerHTML = `
+    <div class="check">${dots(runs.length,3)} <span>Бег по <b class="num">${nf(target(w))}</b> км · сделано <b class="num">${nf(km)}</b> из ${nf(target(w)*3)} км</span>${DELOAD.has(w)?' <span class="pill">разгрузка</span>':""}${w>PLAN.length?' <span class="pill g">поддержка 10 км</span>':""}</div>
+    <div class="check">${dots(pulls.length,2)} <span>Подтягивания, 2 тренировки</span></div>
+    <div class="check">${dots(dips.length,2)} <span>Брусья, 2 тренировки</span></div>`;
+
+  // programmes
+  const pp = pullProgram(pm, pulls.length), dp = dipProgram(dm);
+  const needTest = !byType("pull").some(e=>e.test && weekOf(e.date)===w);
+  $("prog").innerHTML = [["Подтягивания", pp, pm],["Брусья", dp, dm]].map(([name,p,m])=>
+    `<div class="panel"><h3>${name}</h3><span class="pill g">${p.title}</span> <span class="hint">максимум сейчас: <b class="num">${m}</b></span>
+     <ul>${p.items.map(i=>`<li>${i}</li>`).join("")}</ul></div>`).join("") +
+    (needTest ? `<p class="hint" style="grid-column:1/-1">На этой неделе ещё нет теста на максимум подтягиваний. Сделай его в начале одной из тренировок и отметь галочкой.</p>` : "");
+
+  // plan
+  const rows = [];
+  for (let i=1;i<=PLAN.length;i++){
+    const s = weekStart(i), e = weekEnd(i);
+    const done = byType("run").filter(x=>x.date>=s&&x.date<=e).reduce((a,x)=>a+(x.km||0),0);
+    rows.push(`<tr class="${i===w?"now":""}"><td class="num">${i}${DELOAD.has(i)?' <span class="pill">разгрузка</span>':""}</td><td>${human(s)} – ${human(e)}</td><td class="num">${nf(PLAN[i-1])} км</td><td class="num">${nf(PLAN[i-1]*3)} км</td><td class="num">${done?nf(done)+" км":"–"}</td></tr>`);
+  }
+  rows.push(`<tr class="${w>PLAN.length?"now":""}"><td>дальше</td><td>с ${human(weekStart(PLAN.length+1))}</td><td class="num">10 км</td><td colspan="2">держать 1–2 месяца, потом 4-я пробежка на 5 км</td></tr>`);
+  $("planBody").innerHTML = rows.join("");
+
+  renderCharts(w);
+  renderJournal();
+}
+
+function lineChart(points, goal){
+  const W=320,H=170,L=26,R=10,T=12,B=26;
+  if(!points.length) return `<p class="empty">Запиши первую тренировку, и здесь появится график.</p>`;
+  const ymax = Math.max(goal, ...points.map(p=>p.v));
+  const xs = i => points.length===1 ? (L+W-R)/2 : L + i*(W-L-R)/(points.length-1);
+  const ys = v => T + (1 - v/ymax)*(H-T-B);
+  let grid = ""; for (let v=0; v<=ymax; v+=5){ grid += `<line x1="${L}" x2="${W-R}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-6}" y="${ys(v)+3}" text-anchor="end">${v}</text>`; }
+  const path = points.map((p,i)=>(i?"L":"M")+xs(i)+","+ys(p.v)).join(" ");
+  const area = path + ` L${xs(points.length-1)},${ys(0)} L${xs(0)},${ys(0)} Z`;
+  const dots = points.map((p,i)=>`<circle cx="${xs(i)}" cy="${ys(p.v)}" r="${i===points.length-1?4.5:3}" fill="${p.test?"var(--lane)":"var(--accent)"}"/>`).join("");
+  const step = Math.max(1, Math.ceil(points.length/5));
+  const labels = points.map((p,i)=> (i%step===0||i===points.length-1) ? `<text x="${xs(i)}" y="${H-8}" text-anchor="middle">${human(p.d)}</text>`:"").join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Лучший подход подтягиваний по датам">
+    ${grid}<line x1="${L}" x2="${W-R}" y1="${ys(goal)}" y2="${ys(goal)}" stroke="var(--lane)" stroke-dasharray="4 4"/>
+    <path d="${area}" fill="var(--accent-soft)" opacity=".7"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}${labels}</svg>
+    <p class="hint"><span style="color:var(--lane)">●</span> тест на максимум · пунктир – цель ${goal}</p>`;
+}
+function barChart(w){
+  const W=320,H=170,L=26,R=10,T=12,B=26;
+  const first = Math.max(1, w-7), weeks = []; for(let i=first;i<=Math.max(w, first+3);i++) weeks.push(i);
+  const data = weeks.map(i=>({w:i, plan:target(i)*3, done:byType("run").filter(x=>x.date>=weekStart(i)&&x.date<=weekEnd(i)).reduce((a,x)=>a+(x.km||0),0)}));
+  const ymax = Math.ceil(Math.max(30, ...data.map(d=>Math.max(d.plan,d.done)))/10)*10;
+  const ys = v => T + (1 - v/ymax)*(H-T-B), bw = (W-L-R)/data.length;
+  let grid=""; for(let v=0;v<=ymax;v+=10){ grid += `<line x1="${L}" x2="${W-R}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L-6}" y="${ys(v)+3}" text-anchor="end">${v}</text>`; }
+  const bars = data.map((d,i)=>{ const x = L+i*bw+bw*.18, wd = bw*.64;
+    return `<rect x="${x}" y="${ys(d.plan)}" width="${wd}" height="${ys(0)-ys(d.plan)}" fill="none" stroke="var(--muted)" stroke-dasharray="3 3" rx="2"/>
+      <rect x="${x}" y="${ys(d.done)}" width="${wd}" height="${ys(0)-ys(d.done)}" fill="${d.w===w?"var(--accent)":"var(--accent-soft)"}" stroke="var(--accent)" rx="2"/>
+      <text x="${x+wd/2}" y="${H-8}" text-anchor="middle">н${d.w}</text>`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Километры за неделю против плана">${grid}${bars}</svg><p class="hint">заливка – пробежал · пунктир – план недели</p>`;
+}
+function renderCharts(w){
+  const pts = []; const m = new Map();
+  byType("pull").forEach(e=>{ const v = best(e); const cur = m.get(e.date); if(!cur || v>cur.v || e.test) m.set(e.date,{d:e.date,v:Math.max(v,cur?cur.v:0),test:e.test||(cur&&cur.test)}); });
+  [...m.values()].sort((a,b)=>a.d.localeCompare(b.d)).forEach(p=>pts.push(p));
+  $("chPull").innerHTML = lineChart(pts.slice(-20), state.goals.pull);
+  $("chRun").innerHTML = barChart(w);
+}
+function renderJournal(){
+  const list = [...state.entries].sort((a,b)=>b.date.localeCompare(a.date) || (b.id>a.id?1:-1)).slice(0,40);
+  if(!list.length){ $("journal").innerHTML = `<p class="empty">Пока пусто. Запиши первую тренировку выше.</p>`; return; }
+  $("journal").innerHTML = list.map(e=>{
+    let what;
+    if(e.type==="run") what = `<b>Бег ${nf(e.km)} км</b>${e.min?` · <span class="num">${fmtMin(e.min)}</span> · <span class="num">${pace(e.min,e.km)}</span>`:""}`;
+    else { const tot = e.sets.reduce((a,b)=>a+b,0);
+      what = `<b>${e.type==="pull"?"Подтягивания":"Брусья"}</b>${e.test?' <span class="pill">тест</span>':""} · <span class="num">${e.sets.join("-")||"–"}</span> · всего <span class="num">${tot}</span>${e.neg?` · негативных <span class="num">${e.neg}</span>`:""}`; }
+    return `<div class="entry"><span class="num">${human(e.date)}</span><span class="what">${what}</span><button class="del" data-id="${e.id}" type="button">Удалить</button></div>`;
+  }).join("");
+}
+
+// ---------- persistence ----------
+// Firestore: users/{uid} = {startDate, goals, entries}. Offline writes are queued and sent later.
+function save(){
+  try{ localStorage.setItem("training-log", JSON.stringify(state)); }catch(e){}
+  if(!docRef) return Promise.resolve();
+  const snapshot = JSON.parse(JSON.stringify(state));
+  docRef.set(snapshot).catch(err=>{ $("status").textContent = "Не сохранилось в облако ("+(err&&err.code||"ошибка")+"). Запись осталась на устройстве."; });
+  return Promise.resolve();
+}
+function loadLocal(){ try{ const s = localStorage.getItem("training-log"); if(s) state = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(s)); }catch(e){} }
+// Первая запись Шамиля: 3 подтягивания 25 октября (тест на максимум)
+const FIRST_ENTRIES = [{id:"seed-pull-1025", date:"2026-10-25", type:"pull", sets:[3], neg:0, test:true}];
+
+// ---------- form ----------
+function setType(t){
+  curType = t;
+  document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.t===t)));
+  $("runFields").hidden = t!=="run"; $("setFields").hidden = t==="run"; $("testWrap").hidden = t==="run";
+  $("formHint").textContent = t==="run" ? "Темп посчитается сам." : "Пиши повторения через пробел: «2 2 1 2». Для теста на максимум – одно число.";
+}
+document.querySelector(".seg").addEventListener("click", e=>{ const b = e.target.closest("button"); if(b) setType(b.dataset.t); });
+$("fDate").value = todayISO();
+$("fTime").addEventListener("input", ()=>{ if(curType!=="run") return; const km = Number(String($("fKm").value).replace(",",".")), t = parseTime($("fTime").value); $("formHint").textContent = km && t ? "Темп: "+pace(t,km) : "Темп посчитается сам."; });
+$("fKm").addEventListener("input", ()=>$("fTime").dispatchEvent(new Event("input")));
+$("logForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const date = $("fDate").value || todayISO();
+  const id = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  let entry;
+  if(curType==="run"){
+    const km = Number(String($("fKm").value).replace(",","."));
+    if(!km || km<=0){ $("toast").textContent = "Укажи дистанцию в километрах, например 5,5."; return; }
+    entry = {id, date, type:"run", km, min: parseTime($("fTime").value)};
+  } else {
+    const sets = parseSets($("fSets").value), neg = parseInt($("fNeg").value,10) || 0;
+    if(!sets.length && !neg){ $("toast").textContent = "Впиши повторения по подходам, например 2 2 1 2."; return; }
+    entry = {id, date, type:curType, sets, neg, test: $("fTest").checked};
+  }
+  state.entries.push(entry);
+  render();
+  $("toast").textContent = "Сохранено.";
+  ["fKm","fTime","fSets","fNeg"].forEach(i=>$(i).value=""); $("fTest").checked=false; setType(curType);
+  setTimeout(()=>{ $("toast").textContent=""; }, 2500);
+  await save();
+});
+$("journal").addEventListener("click", e=>{
+  const b = e.target.closest(".del"); if(!b) return;
+  if(!b.classList.contains("arm")){ b.classList.add("arm"); b.textContent = "Точно?"; setTimeout(()=>{ if(b.isConnected){ b.classList.remove("arm"); b.textContent="Удалить"; } }, 3000); return; }
+  state.entries = state.entries.filter(x=>x.id!==b.dataset.id); render(); save();
+});
+
+// ---------- boot ----------
+loadLocal(); setType("run");
+const cfg = window.FIREBASE_CONFIG;
+const showApp = () => { $("authView").hidden = true; $("appView").hidden = false; render(); };
+const showAuth = () => { $("appView").hidden = true; $("authView").hidden = false; };
+
+if (!cfg || !window.firebase) {
+  if (!state.entries.length) state.entries = FIRST_ENTRIES.slice();
+  showApp(); $("status").textContent = "Облако не подключено: записи хранятся на этом устройстве.";
+} else {
+  firebase.initializeApp(cfg);
+  const auth = firebase.auth(), fs = firebase.firestore();
+  fs.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  let unsub = null;
+  const RU = {"auth/invalid-email":"Почта записана с ошибкой.","auth/missing-password":"Введи пароль.","auth/weak-password":"Пароль слишком короткий, нужно от 6 символов.","auth/email-already-in-use":"Аккаунт с этой почтой уже есть, нажми «Войти».","auth/invalid-credential":"Неверная почта или пароль.","auth/wrong-password":"Неверный пароль.","auth/user-not-found":"Такого аккаунта нет, нажми «Создать аккаунт».","auth/network-request-failed":"Нет интернета. Для первого входа он нужен.","auth/too-many-requests":"Слишком много попыток, подожди пару минут.","auth/operation-not-allowed":"В Firebase не включён вход по почте и паролю."};
+  const authErr = e => { $("authErr").textContent = RU[e && e.code] || ("Не получилось: " + (e && (e.code || e.message))); };
+  const creds = () => [$("aEmail").value.trim(), $("aPass").value];
+  $("authForm").addEventListener("submit", e => { e.preventDefault(); $("authErr").textContent = ""; auth.signInWithEmailAndPassword(...creds()).catch(authErr); });
+  $("aSignup").addEventListener("click", () => { $("authErr").textContent = ""; auth.createUserWithEmailAndPassword(...creds()).catch(authErr); });
+  $("signOut").addEventListener("click", () => auth.signOut());
+  auth.onAuthStateChanged(u => {
+    if (unsub) { unsub(); unsub = null; }
+    if (!u) { docRef = null; $("signOut").hidden = true; showAuth(); return; }
+    $("signOut").hidden = false; showApp();
+    docRef = fs.collection("users").doc(u.uid);
+    unsub = docRef.onSnapshot({includeMetadataChanges:true}, snap => {
+      if (snap.exists) {
+        state = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), snap.data());
+        try{ localStorage.setItem("training-log", JSON.stringify(state)); }catch(e){}
+        render();
+      } else if (!snap.metadata.fromCache) {
+        if (!state.entries.length) state.entries = FIRST_ENTRIES.slice();
+        save(); render();
+      }
+      $("status").textContent = snap.metadata.hasPendingWrites ? "Есть записи, которые ещё не ушли в облако, отправятся при появлении интернета."
+        : snap.metadata.fromCache ? "Без интернета: записи сохранятся и отправятся позже." : "Синхронизировано с " + u.email + ".";
+    }, err => { $("status").textContent = "Ошибка облака: " + (err.code || err.message); });
+  });
+}
+</script>
+</body>
+</html>

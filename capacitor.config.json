@@ -1,0 +1,6 @@
+{
+  "appId": "com.shamil.training",
+  "appName": "Тренировки",
+  "webDir": "www",
+  "android": { "adjustMarginsForEdgeToEdge": "auto" }
+}
